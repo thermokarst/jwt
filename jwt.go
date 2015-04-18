@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -95,8 +97,16 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	response := strings.Join([]string{header, claimsSet}, ".")
+	toSig := strings.Join([]string{header, claimsSet}, ".")
 
+	h := hmac.New(sha256.New, []byte(m.secret))
+	h.Write([]byte(toSig))
+	sig, err := encode(h.Sum(nil))
+	if err != nil {
+		panic(err)
+	}
+
+	response := strings.Join([]string{toSig, sig}, ".")
 	w.Write([]byte(response))
 }
 

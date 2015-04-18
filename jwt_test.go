@@ -2,6 +2,8 @@ package jwt
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -138,5 +140,12 @@ func TestGenerateTokenHandler(t *testing.T) {
 	d := time.Minute * 60 * 24
 	if duration != d {
 		t.Errorf("wanted %v, got %v", d, duration)
+	}
+	mac := hmac.New(sha256.New, []byte(middleware.secret))
+	message := []byte(strings.Join([]string{j[0], j[1]}, "."))
+	mac.Write(message)
+	expectedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(j[2]), []byte(expectedMac)) {
+		t.Errorf("wanted %v, got %v", expectedMac, j[2])
 	}
 }
