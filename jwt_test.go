@@ -20,8 +20,8 @@ var testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte("test"))
 })
 
-var authFunc = func(email, password string) (bool, error) {
-	return true, nil
+var authFunc = func(email, password string) error {
+	return nil
 }
 
 var claimsFunc = func(id string) (map[string]interface{}, error) {
@@ -32,7 +32,7 @@ var claimsFunc = func(id string) (map[string]interface{}, error) {
 	}, nil
 }
 
-var verifyClaimsFunc = func(claims []byte) (bool, error) {
+var verifyClaimsFunc = func(claims []byte) error {
 	currentTime := time.Now()
 	var c struct {
 		Exp int64
@@ -40,12 +40,12 @@ var verifyClaimsFunc = func(claims []byte) (bool, error) {
 	}
 	err := json.Unmarshal(claims, &c)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if currentTime.After(time.Unix(c.Exp, 0)) {
-		return false, errors.New("expired")
+		return errors.New("expired")
 	}
-	return true, nil
+	return nil
 }
 
 func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
@@ -89,12 +89,9 @@ func TestNewJWTMiddleware(t *testing.T) {
 	if middleware.secret != "password" {
 		t.Errorf("wanted password, got %v", middleware.secret)
 	}
-	authVal, err := middleware.auth("", "")
+	err := middleware.auth("", "")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if authVal != true {
-		t.Errorf("wanted true, got %v", authVal)
 	}
 	claimsVal, err := middleware.claims("1")
 	if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,8 +14,12 @@ func protectMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var authFunc = func(string, string) (bool, error) {
-		return true, nil
+	var authFunc = func(email string, password string) error {
+		// Hard-code a user
+		if email != "test" || password != "test" {
+			return errors.New("invalid credentials")
+		}
+		return nil
 	}
 
 	var claimsFunc = func(string) (map[string]interface{}, error) {
@@ -25,8 +30,9 @@ func main() {
 		}, nil
 	}
 
-	var verifyClaimsFunc = func([]byte) (bool, error) {
-		return true, nil
+	var verifyClaimsFunc = func([]byte) error {
+		// We don't really care about the claims, just approve as-is
+		return nil
 	}
 
 	config := &jwt.Config{

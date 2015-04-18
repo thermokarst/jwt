@@ -12,15 +12,16 @@ import (
 )
 
 var (
-	ErrMissingConfig     = errors.New("missing configuration")
-	ErrMissingSecret     = errors.New("please provide a shared secret")
-	ErrMissingAuthFunc   = errors.New("please provide an auth function")
-	ErrMissingClaimsFunc = errors.New("please provide a claims function")
-	ErrEncoding          = errors.New("error encoding value")
-	ErrMissingToken      = errors.New("please provide a token")
-	ErrMalformedToken    = errors.New("please provide a valid token")
-	ErrDecodingHeader    = errors.New("could not decode JOSE header")
-	ErrInvalidSignature  = errors.New("signature could not be verified")
+	ErrMissingConfig      = errors.New("missing configuration")
+	ErrMissingSecret      = errors.New("please provide a shared secret")
+	ErrMissingAuthFunc    = errors.New("please provide an auth function")
+	ErrMissingClaimsFunc  = errors.New("please provide a claims function")
+	ErrEncoding           = errors.New("error encoding value")
+	ErrMissingToken       = errors.New("please provide a token")
+	ErrMalformedToken     = errors.New("please provide a valid token")
+	ErrDecodingHeader     = errors.New("could not decode JOSE header")
+	ErrInvalidSignature   = errors.New("signature could not be verified")
+	ErrParsingCredentials = errors.New("error parsing credentials")
 )
 
 type Config struct {
@@ -29,11 +30,11 @@ type Config struct {
 	Claims ClaimsFunc
 }
 
-type AuthFunc func(string, string) (bool, error)
+type AuthFunc func(string, string) error
 
 type ClaimsFunc func(string) (map[string]interface{}, error)
 
-type VerifyClaimsFunc func([]byte) (bool, error)
+type VerifyClaimsFunc func([]byte) error
 
 type JWTMiddleware struct {
 	secret string
@@ -70,11 +71,11 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 			return
 		}
 		token := strings.Split(authHeader, " ")[1]
-		if strings.LastIndex(token, ".") == -1 {
+		tokenParts := strings.Split(token, ".")
+		if len(tokenParts) != 3 {
 			http.Error(w, ErrMalformedToken.Error(), http.StatusUnauthorized)
 			return
 		}
-		tokenParts := strings.Split(token, ".")
 
 		// First, verify JOSE header
 		var t struct {
@@ -115,9 +116,9 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 			panic(err)
 			return
 		}
-		claimsTest, err := v(claimSet)
-		if !claimsTest {
-			log.Printf("test: %v, error: %v", claimsTest, err)
+		err = v(claimSet)
+		if err != nil {
+			log.Printf("claims error: %v", err)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -131,14 +132,15 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	var b map[string]string
 	err := json.NewDecoder(r.Body).Decode(&b)
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while parsing authorization", err)
+		http.Error(w, ErrParsingCredentials.Error(), http.StatusInternalServerError)
+		return
 	}
-	result, err := m.auth(b["email"], b["password"])
+	err = m.auth(b["email"], b["password"])
 	if err != nil {
-		panic(err)
-	}
-	if !result {
-		panic("deal with this")
+		log.Printf("error (%v) while performing authorization", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// For now, the header will be static
