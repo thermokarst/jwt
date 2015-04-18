@@ -20,6 +20,7 @@ var (
 	ErrMissingToken      = errors.New("please provide a token")
 	ErrMalformedToken    = errors.New("please provide a valid token")
 	ErrDecodingHeader    = errors.New("could not decode JOSE header")
+	ErrInvalidSignature  = errors.New("signature could not be verified")
 )
 
 type Config struct {
@@ -71,12 +72,13 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 			http.Error(w, ErrMalformedToken.Error(), http.StatusUnauthorized)
 			return
 		}
+		tokenParts := strings.Split(token, ".")
+
 		// Verify JOSE header
 		var t struct {
 			Typ string
 			Alg string
 		}
-		tokenParts := strings.Split(token, ".")
 		header, err := decode(tokenParts[0])
 		if err != nil {
 			log.Printf("error (%v) while decoding header (%v)", err, tokenParts[0])
@@ -87,6 +89,21 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 		if err != nil {
 			log.Printf("error (%v) while unmarshalling header (%s)", err, header)
 			http.Error(w, ErrMalformedToken.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Verify signature
+		mac := hmac.New(sha256.New, []byte(m.secret))
+		message := []byte(strings.Join([]string{tokenParts[0], tokenParts[1]}, "."))
+		mac.Write(message)
+		expectedMac, err := encode(mac.Sum(nil))
+		if err != nil {
+			panic(err)
+			return
+		}
+		if !hmac.Equal([]byte(tokenParts[2]), []byte(expectedMac)) {
+			log.Printf("invalid signature: %v", tokenParts[2])
+			http.Error(w, ErrInvalidSignature.Error(), http.StatusUnauthorized)
 			return
 		}
 		h.ServeHTTP(w, r)

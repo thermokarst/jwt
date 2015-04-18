@@ -176,6 +176,20 @@ func TestSecureHandlerBadToken(t *testing.T) {
 	}
 }
 
+func TestSecureHandlerBadSignature(t *testing.T) {
+	token, middleware := newToken(t)
+	parts := strings.Split(token, ".")
+	token = strings.Join([]string{parts[0], parts[1], "abcd"}, ".")
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != ErrInvalidSignature.Error() {
+		t.Errorf("wanted %s, got %s", ErrInvalidSignature.Error(), body)
+	}
+}
+
 func TestSecureHandlerGoodToken(t *testing.T) {
 	token, middleware := newToken(t)
 	resp := httptest.NewRecorder()
