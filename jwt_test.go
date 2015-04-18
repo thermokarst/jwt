@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +30,22 @@ var claimsFunc = func(id string) (map[string]interface{}, error) {
 		"iat": currentTime.Unix(),
 		"exp": currentTime.Add(time.Minute * 60 * 24).Unix(),
 	}, nil
+}
+
+var verifyClaimsFunc = func(claims []byte) (bool, error) {
+	currentTime := time.Now()
+	var c struct {
+		Exp int64
+		Iat int64
+	}
+	err := json.Unmarshal(claims, &c)
+	if err != nil {
+		return false, err
+	}
+	if currentTime.After(time.Unix(c.Exp, 0)) {
+		return false, errors.New("expired")
+	}
+	return true, nil
 }
 
 func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
@@ -148,7 +165,7 @@ func TestSecureHandlerNoToken(t *testing.T) {
 	middleware := newJWTMiddlewareOrFatal(t)
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
 	body := strings.TrimSpace(resp.Body.String())
 	if body != ErrMissingToken.Error() {
 		t.Errorf("wanted %q, got %q", ErrMissingToken.Error(), body)
@@ -160,7 +177,7 @@ func TestSecureHandlerBadToken(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	req.Header.Set("Authorization", "Bearer abcdefg")
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
 	body := strings.TrimSpace(resp.Body.String())
 	if body != ErrMalformedToken.Error() {
 		t.Errorf("wanted %q, got %q", ErrMalformedToken.Error(), body)
@@ -169,7 +186,7 @@ func TestSecureHandlerBadToken(t *testing.T) {
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "http://example.com", nil)
 	req.Header.Set("Authorization", "Bearer abcd.abcd.abcd")
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
 	body = strings.TrimSpace(resp.Body.String())
 	if body != ErrMalformedToken.Error() {
 		t.Errorf("wanted %q, got %q", ErrMalformedToken.Error(), body)
@@ -183,7 +200,7 @@ func TestSecureHandlerBadSignature(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
 	body := strings.TrimSpace(resp.Body.String())
 	if body != ErrInvalidSignature.Error() {
 		t.Errorf("wanted %s, got %s", ErrInvalidSignature.Error(), body)
@@ -195,7 +212,7 @@ func TestSecureHandlerGoodToken(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
 	body := strings.TrimSpace(resp.Body.String())
 	if body != "test" {
 		t.Errorf("wanted %s, got %s", "test", body)

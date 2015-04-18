@@ -31,7 +31,9 @@ type Config struct {
 
 type AuthFunc func(string, string) (bool, error)
 
-type ClaimsFunc func(id string) (map[string]interface{}, error)
+type ClaimsFunc func(string) (map[string]interface{}, error)
+
+type VerifyClaimsFunc func([]byte) (bool, error)
 
 type JWTMiddleware struct {
 	secret string
@@ -60,7 +62,7 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 	return m, nil
 }
 
-func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
+func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
@@ -74,7 +76,7 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 		}
 		tokenParts := strings.Split(token, ".")
 
-		// Verify JOSE header
+		// First, verify JOSE header
 		var t struct {
 			Typ string
 			Alg string
@@ -92,7 +94,7 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 			return
 		}
 
-		// Verify signature
+		// Then, verify signature
 		mac := hmac.New(sha256.New, []byte(m.secret))
 		message := []byte(strings.Join([]string{tokenParts[0], tokenParts[1]}, "."))
 		mac.Write(message)
@@ -106,6 +108,21 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 			http.Error(w, ErrInvalidSignature.Error(), http.StatusUnauthorized)
 			return
 		}
+
+		// Finally, check claims
+		claimSet, err := decode(tokenParts[1])
+		if err != nil {
+			panic(err)
+			return
+		}
+		claimsTest, err := v(claimSet)
+		if !claimsTest {
+			log.Printf("test: %v, error: %v", claimsTest, err)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// If we make it this far, process the downstream handler
 		h.ServeHTTP(w, r)
 	})
 }
