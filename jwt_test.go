@@ -34,7 +34,13 @@ func TestNewJWTMiddleware(t *testing.T) {
 	if middleware.secret != "password" {
 		t.Errorf("expected 'password', got %v", middleware.secret)
 	}
-	// TODO: test auth func init
+	val, err := middleware.auth("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != true {
+		t.Errorf("expected true, %v", val)
+	}
 }
 
 func TestNewJWTMiddlewareNoConfig(t *testing.T) {
