@@ -31,16 +31,24 @@ func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
 
 func TestNewJWTMiddleware(t *testing.T) {
 	middleware := newJWTMiddlewareOrFatal(t)
-	if middleware.config.Secret != "password" {
-		t.Errorf("expected 'password', got %v", middleware.config.Secret)
+	if middleware.secret != "password" {
+		t.Errorf("expected 'password', got %v", middleware.secret)
 	}
 	// TODO: test auth func init
 }
 
 func TestNewJWTMiddlewareNoConfig(t *testing.T) {
-	_, err := NewMiddleware(nil)
-	if err == nil {
-		t.Error("expected configuration error, received none")
+	cases := map[*Config]error{
+		nil:                       ErrMissingConfig,
+		&Config{}:                 ErrMissingSecret,
+		&Config{Auth: authFunc}:   ErrMissingSecret,
+		&Config{Secret: "secret"}: ErrMissingAuthFunc,
+	}
+	for config, jwtErr := range cases {
+		_, err := NewMiddleware(config)
+		if err != jwtErr {
+			t.Errorf("wanted error: %v, got error: %v using config: %v", jwtErr, err, config)
+		}
 	}
 }
 

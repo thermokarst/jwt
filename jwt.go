@@ -6,6 +6,12 @@ import (
 	"net/http"
 )
 
+var (
+	ErrMissingConfig   = errors.New("missing configuration")
+	ErrMissingSecret   = errors.New("please provide a shared secret")
+	ErrMissingAuthFunc = errors.New("please provide an auth function")
+)
+
 type Config struct {
 	Secret string
 	Auth   AuthFunc
@@ -14,14 +20,24 @@ type Config struct {
 type AuthFunc func(string, string) (bool, error)
 
 type JWTMiddleware struct {
-	config Config
+	secret string
+	auth   AuthFunc
 }
 
 func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 	if c == nil {
-		return nil, errors.New("missing configuration")
+		return nil, ErrMissingConfig
 	}
-	m := &JWTMiddleware{config: *c}
+	if c.Secret == "" {
+		return nil, ErrMissingSecret
+	}
+	if c.Auth == nil {
+		return nil, ErrMissingAuthFunc
+	}
+	m := &JWTMiddleware{
+		secret: c.Secret,
+		auth:   c.Auth,
+	}
 	return m, nil
 }
 
@@ -37,7 +53,7 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	result, err := m.config.Auth(b["email"], b["password"])
+	result, err := m.auth(b["email"], b["password"])
 	if err != nil {
 		panic(err)
 	}
