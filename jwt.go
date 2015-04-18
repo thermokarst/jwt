@@ -8,7 +8,10 @@ import (
 
 type Config struct {
 	Secret string
+	Auth   AuthFunc
 }
+
+type AuthFunc func(string, string) (bool, error)
 
 type JWTMiddleware struct {
 	config Config
@@ -28,11 +31,19 @@ func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
 	})
 }
 
-func (m *JWTMiddleware) Auth(w http.ResponseWriter, r *http.Request) {
-	var b interface{}
+func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
+	var b map[string]string
 	err := json.NewDecoder(r.Body).Decode(&b)
 	if err != nil {
 		panic(err)
 	}
-	w.Write([]byte("test"))
+	result, err := m.config.Auth(b["email"], b["password"])
+	if err != nil {
+		panic(err)
+	}
+	resp := "failure"
+	if result {
+		resp = "success"
+	}
+	w.Write([]byte(resp))
 }

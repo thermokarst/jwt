@@ -13,9 +13,14 @@ var testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte("test"))
 })
 
+var authFunc = func(email, password string) (bool, error) {
+	return true, nil
+}
+
 func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
 	config := &Config{
 		Secret: "password",
+		Auth:   authFunc,
 	}
 	middleware, err := NewMiddleware(config)
 	if err != nil {
@@ -29,6 +34,7 @@ func TestNewJWTMiddleware(t *testing.T) {
 	if middleware.config.Secret != "password" {
 		t.Errorf("expected 'password', got %v", middleware.config.Secret)
 	}
+	// TODO: test auth func init
 }
 
 func TestNewJWTMiddlewareNoConfig(t *testing.T) {
@@ -48,7 +54,7 @@ func TestSecureHandler(t *testing.T) {
 	}
 }
 
-func TestAuthHandler(t *testing.T) {
+func TestGenerateTokenHandler(t *testing.T) {
 	middleware := newJWTMiddlewareOrFatal(t)
 	authBody := map[string]interface{}{
 		"email":    "user@example.com",
@@ -58,7 +64,7 @@ func TestAuthHandler(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ts := httptest.NewServer(http.HandlerFunc(middleware.Auth))
+	ts := httptest.NewServer(http.HandlerFunc(middleware.GenerateToken))
 	defer ts.Close()
 	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
 	respBody, err := ioutil.ReadAll(resp.Body)
@@ -66,7 +72,7 @@ func TestAuthHandler(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if string(respBody) != "test" {
-		t.Errorf("expected 'test', got %v", respBody)
+	if string(respBody) != "success" {
+		t.Errorf("expected 'success', got %v", string(respBody))
 	}
 }
