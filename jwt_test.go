@@ -32,14 +32,14 @@ func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
 func TestNewJWTMiddleware(t *testing.T) {
 	middleware := newJWTMiddlewareOrFatal(t)
 	if middleware.secret != "password" {
-		t.Errorf("expected 'password', got %v", middleware.secret)
+		t.Errorf("wanted password, got %v", middleware.secret)
 	}
 	val, err := middleware.auth("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if val != true {
-		t.Errorf("expected true, %v", val)
+		t.Errorf("wanted true, got %v", val)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestSecureHandler(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	middleware.Secure(testHandler).ServeHTTP(resp, req)
 	if resp.Body.String() != "test" {
-		t.Errorf("expected 'test', got %v", resp.Body.String())
+		t.Errorf("wanted test, got %v", resp.Body.String())
 	}
 }
 
@@ -86,7 +86,7 @@ func TestGenerateTokenHandler(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if string(respBody) != "success" {
-		t.Errorf("expected 'success', got %v", string(respBody))
+	if string(respBody) != "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9" {
+		t.Errorf("wanted eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9, got %v", string(respBody))
 	}
 }

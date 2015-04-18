@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -42,6 +43,7 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 }
 
 func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
+	// This is just a placeholder for now
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.ServeHTTP(w, r)
 	})
@@ -57,9 +59,13 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	resp := "failure"
-	if result {
-		resp = "success"
+	if !result {
+		panic("deal with this")
 	}
+
+	// For now, the header will be static
+	resp := `{"typ":"JWT","alg":"HS256"}`
+	resp = base64.StdEncoding.EncodeToString([]byte(resp))
+
 	w.Write([]byte(resp))
 }
