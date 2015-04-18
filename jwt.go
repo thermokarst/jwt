@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -16,6 +17,9 @@ var (
 	ErrMissingAuthFunc   = errors.New("please provide an auth function")
 	ErrMissingClaimsFunc = errors.New("please provide a claims function")
 	ErrEncoding          = errors.New("error encoding value")
+	ErrMissingToken      = errors.New("please provide a token")
+	ErrMalformedToken    = errors.New("please provide a valid token")
+	ErrDecodingHeader    = errors.New("could not decode JOSE header")
 )
 
 type Config struct {
@@ -56,8 +60,35 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 }
 
 func (m *JWTMiddleware) Secure(h http.Handler) http.Handler {
-	// This is just a placeholder for now
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, ErrMissingToken.Error(), http.StatusUnauthorized)
+			return
+		}
+		token := strings.Split(authHeader, " ")[1]
+		if strings.LastIndex(token, ".") == -1 {
+			http.Error(w, ErrMalformedToken.Error(), http.StatusUnauthorized)
+			return
+		}
+		// Verify JOSE header
+		var t struct {
+			Typ string
+			Alg string
+		}
+		tokenParts := strings.Split(token, ".")
+		header, err := decode(tokenParts[0])
+		if err != nil {
+			log.Printf("error (%v) while decoding header (%v)", err, tokenParts[0])
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = json.Unmarshal(header, &t)
+		if err != nil {
+			log.Printf("error (%v) while unmarshalling header (%s)", err, header)
+			http.Error(w, ErrMalformedToken.Error(), http.StatusInternalServerError)
+			return
+		}
 		h.ServeHTTP(w, r)
 	})
 }
@@ -121,4 +152,8 @@ func encode(s interface{}) (string, error) {
 		return "", ErrEncoding
 	}
 	return base64.StdEncoding.EncodeToString(r), nil
+}
+
+func decode(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(s)
 }

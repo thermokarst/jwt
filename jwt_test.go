@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -41,6 +42,29 @@ func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
 		t.Fatalf("new middleware: %v", err)
 	}
 	return middleware
+}
+
+func newToken(t *testing.T) (string, *JWTMiddleware) {
+	middleware := newJWTMiddlewareOrFatal(t)
+	authBody := map[string]interface{}{
+		"email":    "user@example.com",
+		"password": "password",
+	}
+	body, err := json.Marshal(authBody)
+	if err != nil {
+		t.Error(err)
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(middleware.GenerateToken))
+	defer ts.Close()
+
+	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
+	respBody, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Error(err)
+	}
+	return string(respBody), middleware
 }
 
 func TestNewJWTMiddleware(t *testing.T) {
@@ -88,39 +112,9 @@ func TestNewJWTMiddlewareNoConfig(t *testing.T) {
 		}
 	}
 }
-
-func TestSecureHandler(t *testing.T) {
-	middleware := newJWTMiddlewareOrFatal(t)
-	resp := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	middleware.Secure(testHandler).ServeHTTP(resp, req)
-	if resp.Body.String() != "test" {
-		t.Errorf("wanted test, got %v", resp.Body.String())
-	}
-}
-
 func TestGenerateTokenHandler(t *testing.T) {
-	middleware := newJWTMiddlewareOrFatal(t)
-	authBody := map[string]interface{}{
-		"email":    "user@example.com",
-		"password": "password",
-	}
-	body, err := json.Marshal(authBody)
-	if err != nil {
-		t.Error(err)
-	}
-
-	ts := httptest.NewServer(http.HandlerFunc(middleware.GenerateToken))
-	defer ts.Close()
-
-	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
-	respBody, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Error(err)
-	}
-
-	j := strings.Split(string(respBody), ".")
+	token, m := newToken(t)
+	j := strings.Split(token, ".")
 
 	header := base64.StdEncoding.EncodeToString([]byte(`{"typ":"JWT","alg":"HS256"}`))
 	if j[0] != header {
@@ -141,11 +135,55 @@ func TestGenerateTokenHandler(t *testing.T) {
 	if duration != d {
 		t.Errorf("wanted %v, got %v", d, duration)
 	}
-	mac := hmac.New(sha256.New, []byte(middleware.secret))
+	mac := hmac.New(sha256.New, []byte(m.secret))
 	message := []byte(strings.Join([]string{j[0], j[1]}, "."))
 	mac.Write(message)
 	expectedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	if !hmac.Equal([]byte(j[2]), []byte(expectedMac)) {
 		t.Errorf("wanted %v, got %v", expectedMac, j[2])
+	}
+}
+
+func TestSecureHandlerNoToken(t *testing.T) {
+	middleware := newJWTMiddlewareOrFatal(t)
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != ErrMissingToken.Error() {
+		t.Errorf("wanted %q, got %q", ErrMissingToken.Error(), body)
+	}
+}
+
+func TestSecureHandlerBadToken(t *testing.T) {
+	middleware := newJWTMiddlewareOrFatal(t)
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req.Header.Set("Authorization", "Bearer abcdefg")
+	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != ErrMalformedToken.Error() {
+		t.Errorf("wanted %q, got %q", ErrMalformedToken.Error(), body)
+	}
+
+	resp = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "http://example.com", nil)
+	req.Header.Set("Authorization", "Bearer abcd.abcd.abcd")
+	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	body = strings.TrimSpace(resp.Body.String())
+	if body != ErrMalformedToken.Error() {
+		t.Errorf("wanted %q, got %q", ErrMalformedToken.Error(), body)
+	}
+}
+
+func TestSecureHandlerGoodToken(t *testing.T) {
+	token, middleware := newToken(t)
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	middleware.Secure(testHandler).ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != "test" {
+		t.Errorf("wanted %s, got %s", "test", body)
 	}
 }
