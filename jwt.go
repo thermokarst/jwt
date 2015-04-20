@@ -6,9 +6,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+)
+
+const (
+	typ = "JWT"
+	alg = "HS256"
 )
 
 var (
@@ -17,9 +23,9 @@ var (
 	ErrMissingAuthFunc    = errors.New("please provide an auth function")
 	ErrMissingClaimsFunc  = errors.New("please provide a claims function")
 	ErrEncoding           = errors.New("error encoding value")
+	ErrDecoding           = errors.New("error decoding value")
 	ErrMissingToken       = errors.New("please provide a token")
 	ErrMalformedToken     = errors.New("please provide a valid token")
-	ErrDecodingHeader     = errors.New("could not decode JOSE header")
 	ErrInvalidSignature   = errors.New("signature could not be verified")
 	ErrParsingCredentials = errors.New("error parsing credentials")
 )
@@ -113,12 +119,13 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 		// Finally, check claims
 		claimSet, err := decode(tokenParts[1])
 		if err != nil {
-			panic(err)
+			log.Printf("error (%v) while decoding claims", err)
+			http.Error(w, ErrDecoding.Error(), http.StatusInternalServerError)
 			return
 		}
 		err = v(claimSet)
 		if err != nil {
-			log.Printf("claims error: %v", err)
+			log.Printf("claims handler error: %v", err)
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
@@ -144,24 +151,33 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// For now, the header will be static
-	header, err := encode(`{"typ":"JWT","alg":"HS256"}`)
+	header, err := encode(fmt.Sprintf(`{"typ":%q,"alg":%q}`, typ, alg))
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while encoding header", err)
+		http.Error(w, ErrEncoding.Error(), http.StatusInternalServerError)
+		return
 	}
 
+	// Generate claims for user
 	claims, err := m.claims(b["email"])
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while generating claims", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	claimsJson, err := json.Marshal(claims)
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while marshalling claims")
+		http.Error(w, ErrEncoding.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	claimsSet, err := encode(claimsJson)
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while encoding claims")
+		http.Error(w, ErrEncoding.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	toSig := strings.Join([]string{header, claimsSet}, ".")
@@ -170,7 +186,9 @@ func (m *JWTMiddleware) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	h.Write([]byte(toSig))
 	sig, err := encode(h.Sum(nil))
 	if err != nil {
-		panic(err)
+		log.Printf("error (%v) while encoding signature")
+		http.Error(w, ErrEncoding.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	response := strings.Join([]string{toSig, sig}, ".")
