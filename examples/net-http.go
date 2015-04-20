@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 	protect := http.HandlerFunc(protectMe)
-	http.HandleFunc("/authenticate", j.GenerateToken)
+	http.Handle("/authenticate", j.GenerateToken())
 	http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
 	http.ListenAndServe(":8080", nil)
 }

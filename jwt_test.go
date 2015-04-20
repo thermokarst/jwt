@@ -72,7 +72,7 @@ func newToken(t *testing.T) (string, *JWTMiddleware) {
 		t.Error(err)
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(middleware.GenerateToken))
+	ts := httptest.NewServer(middleware.GenerateToken())
 	defer ts.Close()
 
 	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
