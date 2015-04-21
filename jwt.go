@@ -69,23 +69,6 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 	return m, nil
 }
 
-type jwtError struct {
-	status  int
-	err     error
-	message string
-}
-
-type errorHandler func(http.ResponseWriter, *http.Request) *jwtError
-
-func (e errorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := e(w, r); err != nil {
-		if err.message != "" {
-			log.Printf("error (%v) while %s", err.err, err.message)
-		}
-		http.Error(w, err.err.Error(), err.status)
-	}
-}
-
 func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 	secureHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
 		authHeader := r.Header.Get("Authorization")
@@ -99,10 +82,6 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 		}
 
 		// First, verify JOSE header
-		var t struct {
-			Typ string
-			Alg string
-		}
 		header, err := decode(tokenParts[0])
 		if err != nil {
 			return &jwtError{
@@ -110,6 +89,10 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 				err:     err,
 				message: fmt.Sprintf("decoding header (%v)", tokenParts[0]),
 			}
+		}
+		var t struct {
+			Typ string
+			Alg string
 		}
 		err = json.Unmarshal(header, &t)
 		if err != nil {
@@ -158,7 +141,6 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 		h.ServeHTTP(w, r)
 		return nil
 	}
-
 	return errorHandler(secureHandler)
 }
 
@@ -239,6 +221,23 @@ func (m *JWTMiddleware) GenerateToken() http.Handler {
 	}
 
 	return errorHandler(generateHandler)
+}
+
+type jwtError struct {
+	status  int
+	err     error
+	message string
+}
+
+type errorHandler func(http.ResponseWriter, *http.Request) *jwtError
+
+func (e errorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := e(w, r); err != nil {
+		if err.message != "" {
+			log.Printf("error (%v) while %s", err.err, err.message)
+		}
+		http.Error(w, err.err.Error(), err.status)
+	}
 }
 
 func encode(s interface{}) (string, error) {
