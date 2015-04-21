@@ -3,73 +3,75 @@
 A simple, opinionated Go net/http middleware for integrating JSON Web Tokens into
 your application:
 
-    package main
+```go
+package main
 
-    import (
-        "errors"
-        "fmt"
-        "net/http"
-        "time"
+import (
+    "errors"
+    "fmt"
+    "net/http"
+    "time"
 
-        "github.com/thermokarst/jwt"
-    )
+    "github.com/thermokarst/jwt"
+)
 
-    func protectMe(w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintf(w, "secured")
+func protectMe(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "secured")
+}
+
+func main() {
+    var authFunc = func(email string, password string) error {
+        // Hard-code a user --- this could easily be a database call, etc.
+        if email != "test" || password != "test" {
+            return errors.New("invalid credentials")
+        }
+        return nil
     }
 
-    func main() {
-        var authFunc = func(email string, password string) error {
-            // Hard-code a user --- this could easily be a database call, etc.
-            if email != "test" || password != "test" {
-                return errors.New("invalid credentials")
-            }
-            return nil
-        }
+    var claimsFunc = func(userId string) (map[string]interface{}, error) {
+        currentTime := time.Now()
+        return map[string]interface{}{
+            "iat": currentTime.Unix(),
+            "exp": currentTime.Add(time.Minute * 60 * 24).Unix(),
+            "sub": userId,
+        }, nil
+    }
 
-        var claimsFunc = func(userId string) (map[string]interface{}, error) {
-            currentTime := time.Now()
-            return map[string]interface{}{
-                "iat": currentTime.Unix(),
-                "exp": currentTime.Add(time.Minute * 60 * 24).Unix(),
-                "sub": userId,
-            }, nil
+    var verifyClaimsFunc = func(claims []byte) error {
+        currentTime := time.Now()
+        var c struct {
+            Exp int64
+            Iat int64
+            Sub string
         }
-
-        var verifyClaimsFunc = func(claims []byte) error {
-            currentTime := time.Now()
-            var c struct {
-                Exp int64
-                Iat int64
-                Sub string
-            }
-            err := json.Unmarshal(claims, &c)
-            if err != nil {
-                return err
-            }
-            if currentTime.After(time.Unix(c.Exp, 0)) {
-                return errors.New("this token has expired!")
-            }
-            if c.Sub != "test" {
-                return errors.New("who are you??!")
-            }
-            return nil
-        }
-
-        config := &jwt.Config{
-            Secret: "password",
-            Auth:   authFunc,
-            Claims: claimsFunc,
-        }
-        j, err := jwt.NewMiddleware(config)
+        err := json.Unmarshal(claims, &c)
         if err != nil {
-            panic(err)
+            return err
         }
-        protect := http.HandlerFunc(protectMe)
-        http.Handle("/authenticate", j.GenerateToken())
-        http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
-        http.ListenAndServe(":8080", nil)
+        if currentTime.After(time.Unix(c.Exp, 0)) {
+            return errors.New("this token has expired!")
+        }
+        if c.Sub != "test" {
+            return errors.New("who are you??!")
+        }
+        return nil
     }
+
+    config := &jwt.Config{
+        Secret: "password",
+        Auth:   authFunc,
+        Claims: claimsFunc,
+    }
+    j, err := jwt.NewMiddleware(config)
+    if err != nil {
+        panic(err)
+    }
+    protect := http.HandlerFunc(protectMe)
+    http.Handle("/authenticate", j.GenerateToken())
+    http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
+    http.ListenAndServe(":8080", nil)
+}
+```
 
 # Installation
 
@@ -85,17 +87,21 @@ tokens), a function for authenticating user, and a function for generating a
 user's claims. The idea here is to be dead-simple for someone to drop this into
 a project and hit the ground running.
 
-    config := &jwt.Config{
-        Secret: "password",
-        Auth:   authFunc, // func(string, string) error
-        Claims: claimsFunc, // func(string) (map[string]interface{})
-    }
-    j, err := jwt.NewMiddleware(config)
+```go
+config := &jwt.Config{
+    Secret: "password",
+    Auth:   authFunc, // func(string, string) error
+    Claims: claimsFunc, // func(string) (map[string]interface{})
+}
+j, err := jwt.NewMiddleware(config)
+```
 
 Once the middleware is instanciated, create a route for users to generate a JWT
 at.
 
-    http.Handle("/authenticate", j.GenerateToken())
+```go
+http.Handle("/authenticate", j.GenerateToken())
+```
 
 The auth function takes two arguments (the identity, and the authorization
 key), POSTed as a JSON-encoded body:
@@ -112,7 +118,9 @@ function should return a `map[string]interface{}` with the desired claimset.
 Routes are "secured" by calling the `Secure(http.Handler, jwt.VerifyClaimsFunc)`
 handler:
 
-    http.Handle("/secureendpoint", j.Secure(someHandler, verifyClaimsFunc))
+```go
+http.Handle("/secureendpoint", j.Secure(someHandler, verifyClaimsFunc))
+```
 
 The claims verification function is called after the token has been parsed and
 validated: this is where you control how your application handles the claims
