@@ -13,6 +13,10 @@ func protectMe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "secured")
 }
 
+func dontProtectMe(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "not secured")
+}
+
 func main() {
 	var authFunc = func(email string, password string) error {
 		// Hard-code a user
@@ -45,7 +49,9 @@ func main() {
 		panic(err)
 	}
 	protect := http.HandlerFunc(protectMe)
+	dontProtect := http.HandlerFunc(dontProtectMe)
 	http.Handle("/authenticate", j.GenerateToken())
 	http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
+	http.Handle("/insecure", dontProtect)
 	http.ListenAndServe(":8080", nil)
 }
