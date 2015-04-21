@@ -62,7 +62,7 @@ func main() {
         Auth:   authFunc,
         Claims: claimsFunc,
     }
-    j, err := jwt.NewMiddleware(config)
+    j, err := jwt.New(config)
     if err != nil {
         panic(err)
     }
@@ -93,10 +93,10 @@ config := &jwt.Config{
     Auth:   authFunc, // func(string, string) error
     Claims: claimsFunc, // func(string) (map[string]interface{})
 }
-j, err := jwt.NewMiddleware(config)
+j, err := jwt.New(config)
 ```
 
-Once the middleware is instanciated, create a route for users to generate a JWT
+Once the middleware is instantiated, create a route for users to generate a JWT
 at.
 
 ```go

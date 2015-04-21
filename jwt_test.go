@@ -48,21 +48,21 @@ var verifyClaimsFunc = func(claims []byte) error {
 	return nil
 }
 
-func newJWTMiddlewareOrFatal(t *testing.T) *JWTMiddleware {
+func newMiddlewareOrFatal(t *testing.T) *Middleware {
 	config := &Config{
 		Secret: "password",
 		Auth:   authFunc,
 		Claims: claimsFunc,
 	}
-	middleware, err := NewMiddleware(config)
+	middleware, err := New(config)
 	if err != nil {
 		t.Fatalf("new middleware: %v", err)
 	}
 	return middleware
 }
 
-func newToken(t *testing.T) (string, *JWTMiddleware) {
-	middleware := newJWTMiddlewareOrFatal(t)
+func newToken(t *testing.T) (string, *Middleware) {
+	middleware := newMiddlewareOrFatal(t)
 	authBody := map[string]interface{}{
 		"email":    "user@example.com",
 		"password": "password",
@@ -85,7 +85,7 @@ func newToken(t *testing.T) (string, *JWTMiddleware) {
 }
 
 func TestNewJWTMiddleware(t *testing.T) {
-	middleware := newJWTMiddlewareOrFatal(t)
+	middleware := newMiddlewareOrFatal(t)
 	if middleware.secret != "password" {
 		t.Errorf("wanted password, got %v", middleware.secret)
 	}
@@ -120,7 +120,7 @@ func TestNewJWTMiddlewareNoConfig(t *testing.T) {
 		}: ErrMissingClaimsFunc,
 	}
 	for config, jwtErr := range cases {
-		_, err := NewMiddleware(config)
+		_, err := New(config)
 		if err != jwtErr {
 			t.Errorf("wanted error: %v, got error: %v using config: %v", jwtErr, err, config)
 		}
@@ -159,7 +159,7 @@ func TestGenerateTokenHandler(t *testing.T) {
 }
 
 func TestSecureHandlerNoToken(t *testing.T) {
-	middleware := newJWTMiddlewareOrFatal(t)
+	middleware := newMiddlewareOrFatal(t)
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
@@ -170,7 +170,7 @@ func TestSecureHandlerNoToken(t *testing.T) {
 }
 
 func TestSecureHandlerBadToken(t *testing.T) {
-	middleware := newJWTMiddlewareOrFatal(t)
+	middleware := newMiddlewareOrFatal(t)
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
 	req.Header.Set("Authorization", "Bearer abcdefg")

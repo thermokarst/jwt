@@ -44,7 +44,7 @@ func main() {
 		Auth:   authFunc,
 		Claims: claimsFunc,
 	}
-	j, err := jwt.NewMiddleware(config)
+	j, err := jwt.New(config)
 	if err != nil {
 		panic(err)
 	}

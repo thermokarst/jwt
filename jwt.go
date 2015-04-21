@@ -17,6 +17,7 @@ const (
 	alg = "HS256"
 )
 
+// Errors introduced by this package.
 var (
 	ErrMissingConfig      = errors.New("missing configuration")
 	ErrMissingSecret      = errors.New("please provide a shared secret")
@@ -30,25 +31,33 @@ var (
 	ErrParsingCredentials = errors.New("error parsing credentials")
 )
 
+// Config is a container for setting up the JWT middleware.
 type Config struct {
 	Secret string
 	Auth   AuthFunc
 	Claims ClaimsFunc
 }
 
+// AuthFunc is a type for delegating user authentication to the client-code.
 type AuthFunc func(string, string) error
 
+// ClaimsFunc is a type for delegating claims generation to the client-code.
 type ClaimsFunc func(string) (map[string]interface{}, error)
 
+// VerifyClaimsFunc is a type for for processing and validating JWT claims
+// on one or more route's in the client-code.
 type VerifyClaimsFunc func([]byte) error
 
-type JWTMiddleware struct {
+// Middleware is where we store all the specifics related to the client's
+// JWT needs.
+type Middleware struct {
 	secret string
 	auth   AuthFunc
 	claims ClaimsFunc
 }
 
-func NewMiddleware(c *Config) (*JWTMiddleware, error) {
+// New creates a new Middleware from a user-specified configuration.
+func New(c *Config) (*Middleware, error) {
 	if c == nil {
 		return nil, ErrMissingConfig
 	}
@@ -61,7 +70,7 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 	if c.Claims == nil {
 		return nil, ErrMissingClaimsFunc
 	}
-	m := &JWTMiddleware{
+	m := &Middleware{
 		secret: c.Secret,
 		auth:   c.Auth,
 		claims: c.Claims,
@@ -69,7 +78,10 @@ func NewMiddleware(c *Config) (*JWTMiddleware, error) {
 	return m, nil
 }
 
-func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
+// Secure wraps a client-specified http.Handler with a verification function,
+// as well as-built in parsing of the request's JWT. This allows each handler
+// to have it's own verification/validation protocol.
+func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 	secureHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
@@ -144,7 +156,10 @@ func (m *JWTMiddleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler 
 	return errorHandler(secureHandler)
 }
 
-func (m *JWTMiddleware) GenerateToken() http.Handler {
+// GenerateToken returns a middleware that parsing an incoming request for a JWT,
+// calls the client-supplied auth function, and if successful, returns a JWT to
+// the requester.
+func (m *Middleware) GenerateToken() http.Handler {
 	generateHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
 		var b map[string]string
 		err := json.NewDecoder(r.Body).Decode(&b)
@@ -184,7 +199,7 @@ func (m *JWTMiddleware) GenerateToken() http.Handler {
 			}
 		}
 
-		claimsJson, err := json.Marshal(claims)
+		claimsJSON, err := json.Marshal(claims)
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusInternalServerError,
@@ -193,7 +208,7 @@ func (m *JWTMiddleware) GenerateToken() http.Handler {
 			}
 		}
 
-		claimsSet, err := encode(claimsJson)
+		claimsSet, err := encode(claimsJSON)
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusInternalServerError,
