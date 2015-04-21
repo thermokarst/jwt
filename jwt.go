@@ -1,3 +1,5 @@
+// Package jwt implements a simple, opinionated net/http-compatible middleware for
+// integrating JSON Web Tokens (JWT).
 package jwt
 
 import (
@@ -44,8 +46,8 @@ type AuthFunc func(string, string) error
 // ClaimsFunc is a type for delegating claims generation to the client-code.
 type ClaimsFunc func(string) (map[string]interface{}, error)
 
-// VerifyClaimsFunc is a type for for processing and validating JWT claims
-// on one or more route's in the client-code.
+// VerifyClaimsFunc is a type for processing and validating JWT claims on one
+// or more route's in the client-code.
 type VerifyClaimsFunc func([]byte) error
 
 // Middleware is where we store all the specifics related to the client's
