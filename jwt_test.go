@@ -100,6 +100,12 @@ func TestNewJWTMiddleware(t *testing.T) {
 	if _, ok := claimsVal["iat"]; !ok {
 		t.Errorf("wanted a claims set, got %v", claimsVal)
 	}
+	if middleware.identityField != "email" {
+		t.Errorf("wanted email, got %v", middleware.identityField)
+	}
+	if middleware.verifyField != "password" {
+		t.Errorf("wanted password, got %v", middleware.verifyField)
+	}
 }
 
 func TestNewJWTMiddlewareNoConfig(t *testing.T) {
