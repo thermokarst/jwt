@@ -18,7 +18,7 @@ func dontProtectMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var authFunc = func(email string, password string) error {
+	authFunc := func(email string, password string) error {
 		// Hard-code a user
 		if email != "test" || password != "test" {
 			return errors.New("invalid credentials")
@@ -26,7 +26,7 @@ func main() {
 		return nil
 	}
 
-	var claimsFunc = func(string) (map[string]interface{}, error) {
+	claimsFunc := func(string) (map[string]interface{}, error) {
 		currentTime := time.Now()
 		return map[string]interface{}{
 			"iat": currentTime.Unix(),
@@ -34,7 +34,7 @@ func main() {
 		}, nil
 	}
 
-	var verifyClaimsFunc = func([]byte) error {
+	verifyClaimsFunc := func([]byte) error {
 		// We don't really care about the claims, just approve as-is
 		return nil
 	}
@@ -44,12 +44,15 @@ func main() {
 		Auth:   authFunc,
 		Claims: claimsFunc,
 	}
+
 	j, err := jwt.New(config)
 	if err != nil {
 		panic(err)
 	}
+
 	protect := http.HandlerFunc(protectMe)
 	dontProtect := http.HandlerFunc(dontProtectMe)
+
 	http.Handle("/authenticate", j.GenerateToken())
 	http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
 	http.Handle("/insecure", dontProtect)

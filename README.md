@@ -22,7 +22,7 @@ func protectMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-    var authFunc = func(email string, password string) error {
+    authFunc := func(email string, password string) error {
         // Hard-code a user --- this could easily be a database call, etc.
         if email != "test" || password != "test" {
             return errors.New("invalid credentials")
@@ -30,7 +30,7 @@ func main() {
         return nil
     }
 
-    var claimsFunc = func(userId string) (map[string]interface{}, error) {
+    claimsFunc := func(userId string) (map[string]interface{}, error) {
         currentTime := time.Now()
         return map[string]interface{}{
             "iat": currentTime.Unix(),
@@ -39,7 +39,7 @@ func main() {
         }, nil
     }
 
-    var verifyClaimsFunc = func(claims []byte) error {
+    verifyClaimsFunc := func(claims []byte) error {
         currentTime := time.Now()
         var c struct {
             Exp int64
@@ -64,13 +64,17 @@ func main() {
         Auth:   authFunc,
         Claims: claimsFunc,
     }
+
     j, err := jwt.New(config)
     if err != nil {
         panic(err)
     }
+
     protect := http.HandlerFunc(protectMe)
+
     http.Handle("/authenticate", j.GenerateToken())
     http.Handle("/secure", j.Secure(protect, verifyClaimsFunc))
+
     http.ListenAndServe(":8080", nil)
 }
 ```
@@ -97,6 +101,10 @@ config := &jwt.Config{
 }
 j, err := jwt.New(config)
 ```
+
+You can also customize the field names by specifying `IdentityField` and
+`VerifyField` in the `Config` struct, if you want the credentials to be
+something other than `"email"` and `"password"`.
 
 Once the middleware is instantiated, create a route for users to generate a JWT
 at.
