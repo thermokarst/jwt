@@ -219,7 +219,7 @@ func (m *Middleware) GenerateToken() http.Handler {
 		}
 
 		// Generate claims for user
-		claims, err := m.claims(m.identityField)
+		claims, err := m.claims(b[m.identityField])
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusInternalServerError,
