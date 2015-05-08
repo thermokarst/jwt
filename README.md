@@ -9,6 +9,7 @@ your application:
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,8 +42,16 @@ func setClaims(id string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func verifyClaims([]byte) error {
-	// We don't really care about the claims, just approve as-is
+func verifyClaims(claims []byte) error {
+	currentTime := time.Now()
+	var c struct {
+		Iat int64
+		Exp int64
+	}
+	_ = json.Unmarshal(claims, &c)
+	if currentTime.After(time.Unix(c.Exp, 0)) {
+		return errors.New("this token has expired")
+	}
 	return nil
 }
 
