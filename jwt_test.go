@@ -221,3 +221,14 @@ func TestSecureHandlerGoodToken(t *testing.T) {
 		t.Errorf("wanted %s, got %s", "test", body)
 	}
 }
+
+func TestGenerateTokenHandlerNotPOST(t *testing.T) {
+	middleware := newMiddlewareOrFatal(t)
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("PUT", "http://example.com", nil)
+	middleware.GenerateToken().ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != ErrInvalidMethod.Error() {
+		t.Errorf("wanted %q, got %q", ErrInvalidMethod.Error(), body)
+	}
+}

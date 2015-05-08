@@ -31,6 +31,7 @@ var (
 	ErrMalformedToken     = errors.New("please provide a valid token")
 	ErrInvalidSignature   = errors.New("signature could not be verified")
 	ErrParsingCredentials = errors.New("error parsing credentials")
+	ErrInvalidMethod      = errors.New("invalid request method")
 )
 
 // AuthFunc is a type for delegating user authentication to the client-code.
@@ -175,6 +176,13 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 // the requester.
 func (m *Middleware) GenerateToken() http.Handler {
 	generateHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
+		if r.Method != "POST" {
+			return &jwtError{
+				status:  http.StatusBadRequest,
+				err:     ErrInvalidMethod,
+				message: "receiving request",
+			}
+		}
 		var b map[string]string
 		err := json.NewDecoder(r.Body).Decode(&b)
 		if err != nil {
