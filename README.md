@@ -80,6 +80,11 @@ func main() {
 ```shell
 $ http POST :8080/authenticate email=test password=test
 
+    HTTP/1.1 200 OK
+    Content-Length: 130
+    Content-Type: text/plain; charset=utf-8
+    Date: Fri, 08 May 2015 06:31:42 GMT
+
     eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MzExNTI0ODAsImlhdCI6MTQzMTA2NjA4MH0=.UbJmLqOF4bTH/8+o6CrZfoi1Fu7zTDfCV0kwMQyzmos=
 
 $ http GET :8080/secure Authorization:"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MzExNTI0ODAsImlhdCI6MTQzMTA2NjA4MH0=.UbJmLqOF4bTH/8+o6CrZfoi1Fu7zTDfCV0kwMQyzmos="
