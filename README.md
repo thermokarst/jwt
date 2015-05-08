@@ -77,6 +77,21 @@ func main() {
 }
 ```
 
+```shell
+$ http POST :8080/authenticate email=test password=test
+
+    eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MzExNTI0ODAsImlhdCI6MTQzMTA2NjA4MH0=.UbJmLqOF4bTH/8+o6CrZfoi1Fu7zTDfCV0kwMQyzmos=
+
+$ http GET :8080/secure Authorization:"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MzExNTI0ODAsImlhdCI6MTQzMTA2NjA4MH0=.UbJmLqOF4bTH/8+o6CrZfoi1Fu7zTDfCV0kwMQyzmos="
+
+    HTTP/1.1 200 OK
+    Content-Length: 7
+    Content-Type: text/plain; charset=utf-8
+    Date: Fri, 08 May 2015 06:38:30 GMT
+
+    secured
+```
+
 # Installation
 
     $ go get github.com/thermokarst/jwt
