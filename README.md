@@ -78,6 +78,15 @@ func main() {
 ```
 
 ```shell
+$ http GET :8080/secure
+
+    HTTP/1.1 401 Unauthorized
+    Content-Length: 23
+    Content-Type: text/plain; charset=utf-8
+    Date: Fri, 08 May 2015 06:43:35 GMT
+
+    please provide a token
+
 $ http POST :8080/authenticate email=test password=test
 
     HTTP/1.1 200 OK
