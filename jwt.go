@@ -41,8 +41,8 @@ type AuthFunc func(string, string) error
 type ClaimsFunc func(string) (map[string]interface{}, error)
 
 // VerifyClaimsFunc is a type for processing and validating JWT claims on one
-// or more route's in the client-code.
-type VerifyClaimsFunc func([]byte) error
+// or more routes in the client-code.
+type VerifyClaimsFunc func([]byte, *http.Request) error
 
 // Config is a container for setting up the JWT middleware.
 type Config struct {
@@ -155,7 +155,7 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 				message: "decoding claims",
 			}
 		}
-		err = v(claimSet)
+		err = v(claimSet, r)
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusUnauthorized,

@@ -32,7 +32,7 @@ var claimsFunc = func(id string) (map[string]interface{}, error) {
 	}, nil
 }
 
-var verifyClaimsFunc = func(claims []byte) error {
+var verifyClaimsFunc = func(claims []byte, r *http.Request) error {
 	currentTime := time.Now()
 	var c struct {
 		Exp int64

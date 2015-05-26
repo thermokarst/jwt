@@ -42,7 +42,7 @@ func setClaims(id string) (map[string]interface{}, error) {
 	}, nil
 }
 
-func verifyClaims(claims []byte) error {
+func verifyClaims(claims []byte, r *http.Request) error {
 	currentTime := time.Now()
 	var c struct {
 		Iat int64
