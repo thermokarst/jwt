@@ -72,7 +72,7 @@ func newToken(t *testing.T) (string, *Middleware) {
 		t.Error(err)
 	}
 
-	ts := httptest.NewServer(middleware.GenerateToken())
+	ts := httptest.NewServer(middleware.Authenticate())
 	defer ts.Close()
 
 	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
@@ -226,7 +226,7 @@ func TestGenerateTokenHandlerNotPOST(t *testing.T) {
 	middleware := newMiddlewareOrFatal(t)
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("PUT", "http://example.com", nil)
-	middleware.GenerateToken().ServeHTTP(resp, req)
+	middleware.Authenticate().ServeHTTP(resp, req)
 	body := strings.TrimSpace(resp.Body.String())
 	if body != ErrInvalidMethod.Error() {
 		t.Errorf("wanted %q, got %q", ErrInvalidMethod.Error(), body)

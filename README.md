@@ -70,7 +70,7 @@ func main() {
 	protect := http.HandlerFunc(protectMe)
 	dontProtect := http.HandlerFunc(dontProtectMe)
 
-	http.Handle("/authenticate", j.GenerateToken())
+	http.Handle("/authenticate", j.Authenticate())
 	http.Handle("/secure", j.Secure(protect, verifyClaims))
 	http.Handle("/insecure", dontProtect)
 	http.ListenAndServe(":8080", nil)
@@ -137,7 +137,7 @@ Once the middleware is instantiated, create a route for users to generate a JWT
 at.
 
 ```go
-http.Handle("/authenticate", j.GenerateToken())
+http.Handle("/authenticate", j.Authenticate())
 ```
 
 The auth function takes two arguments (the identity, and the authorization

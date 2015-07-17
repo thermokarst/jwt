@@ -171,10 +171,10 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 	return errorHandler(secureHandler)
 }
 
-// GenerateToken returns a middleware that parsing an incoming request for a JWT,
+// Authenticate returns a middleware that parsing an incoming request for a JWT,
 // calls the client-supplied auth function, and if successful, returns a JWT to
 // the requester.
-func (m *Middleware) GenerateToken() http.Handler {
+func (m *Middleware) Authenticate() http.Handler {
 	generateHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
 		if r.Method != "POST" {
 			return &jwtError{
@@ -215,64 +215,56 @@ func (m *Middleware) GenerateToken() http.Handler {
 				message: "performing authorization",
 			}
 		}
-
-		// For now, the header will be static
-		header, err := encode(fmt.Sprintf(`{"typ":%q,"alg":%q}`, typ, alg))
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrEncoding,
-				message: "encoding header",
-			}
-		}
-
-		// Generate claims for user
-		claims, err := m.claims(b[m.identityField])
+		response, err := m.CreateToken(b[m.identityField])
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusInternalServerError,
 				err:     err,
-				message: "generating claims",
+				message: response,
 			}
 		}
-
-		claimsJSON, err := json.Marshal(claims)
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrEncoding,
-				message: "marshalling claims",
-			}
-		}
-
-		claimsSet, err := encode(claimsJSON)
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrEncoding,
-				message: "encoding claims",
-			}
-		}
-
-		toSig := strings.Join([]string{header, claimsSet}, ".")
-
-		h := hmac.New(sha256.New, []byte(m.secret))
-		h.Write([]byte(toSig))
-		sig, err := encode(h.Sum(nil))
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrEncoding,
-				message: "encoding signature",
-			}
-		}
-
-		response := strings.Join([]string{toSig, sig}, ".")
 		w.Write([]byte(response))
 		return nil
 	}
 
 	return errorHandler(generateHandler)
+}
+
+// CreateToken generates a token from a user's identity
+func (m *Middleware) CreateToken(identity string) (string, error) {
+	// For now, the header will be static
+	header, err := encode(fmt.Sprintf(`{"typ":%q,"alg":%q}`, typ, alg))
+	if err != nil {
+		return "encoding header", ErrEncoding
+	}
+
+	// Generate claims for user
+	claims, err := m.claims(identity)
+	if err != nil {
+		return "generating claims", err
+	}
+
+	claimsJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "mashalling claims", ErrEncoding
+	}
+
+	claimsSet, err := encode(claimsJSON)
+	if err != nil {
+		return "encoding claims", ErrEncoding
+	}
+
+	toSig := strings.Join([]string{header, claimsSet}, ".")
+
+	h := hmac.New(sha256.New, []byte(m.secret))
+	h.Write([]byte(toSig))
+	sig, err := encode(h.Sum(nil))
+	if err != nil {
+		return "encoding signature", ErrEncoding
+	}
+
+	response := strings.Join([]string{toSig, sig}, ".")
+	return response, nil
 }
 
 type jwtError struct {
