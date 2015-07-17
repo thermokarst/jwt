@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -98,11 +99,22 @@ func New(c *Config) (*Middleware, error) {
 // to have it's own verification/validation protocol.
 func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 	secureHandler := func(w http.ResponseWriter, r *http.Request) *jwtError {
+		var token string
+
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			return &jwtError{status: http.StatusUnauthorized, err: ErrMissingToken}
+			queryParam := r.FormValue("token")
+			if queryParam == "" {
+				return &jwtError{status: http.StatusUnauthorized, err: ErrMissingToken}
+			}
+			var err error
+			token, err = url.QueryUnescape(queryParam)
+			if err != nil {
+				return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
+			}
+		} else {
+			token = strings.Split(authHeader, " ")[1]
 		}
-		token := strings.Split(authHeader, " ")[1]
 		tokenParts := strings.Split(token, ".")
 		if len(tokenParts) != 3 {
 			return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
