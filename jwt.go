@@ -115,64 +115,12 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 		} else {
 			token = strings.Split(authHeader, " ")[1]
 		}
-		tokenParts := strings.Split(token, ".")
-		if len(tokenParts) != 3 {
-			return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
-		}
 
-		// First, verify JOSE header
-		header, err := decode(tokenParts[0])
-		if err != nil {
+		if status, err, message := m.VerifyToken(token, v, r); err != nil {
 			return &jwtError{
-				status:  http.StatusInternalServerError,
+				status:  status,
 				err:     err,
-				message: fmt.Sprintf("decoding header (%v)", tokenParts[0]),
-			}
-		}
-		var t struct {
-			Typ string
-			Alg string
-		}
-		err = json.Unmarshal(header, &t)
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrMalformedToken,
-				message: fmt.Sprintf("unmarshalling header (%s)", header),
-			}
-		}
-
-		// Then, verify signature
-		mac := hmac.New(sha256.New, []byte(m.secret))
-		message := []byte(strings.Join([]string{tokenParts[0], tokenParts[1]}, "."))
-		mac.Write(message)
-		expectedMac, err := encode(mac.Sum(nil))
-		if err != nil {
-			return &jwtError{status: http.StatusInternalServerError, err: err}
-		}
-		if !hmac.Equal([]byte(tokenParts[2]), []byte(expectedMac)) {
-			return &jwtError{
-				status:  http.StatusUnauthorized,
-				err:     ErrInvalidSignature,
-				message: fmt.Sprintf("checking signature (%v)", tokenParts[2]),
-			}
-		}
-
-		// Finally, check claims
-		claimSet, err := decode(tokenParts[1])
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrDecoding,
-				message: "decoding claims",
-			}
-		}
-		err = v(claimSet, r)
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusUnauthorized,
-				err:     err,
-				message: "handling claims callback",
+				message: message,
 			}
 		}
 
@@ -277,6 +225,52 @@ func (m *Middleware) CreateToken(identity string) (string, error) {
 
 	response := strings.Join([]string{toSig, sig}, ".")
 	return response, nil
+}
+
+// VerifyToken verifies a token
+func (m *Middleware) VerifyToken(token string, v VerifyClaimsFunc, r *http.Request) (int, error, string) {
+	tokenParts := strings.Split(token, ".")
+	if len(tokenParts) != 3 {
+		return http.StatusUnauthorized, ErrMalformedToken, ""
+	}
+
+	// First, verify JOSE header
+	header, err := decode(tokenParts[0])
+	if err != nil {
+		return http.StatusInternalServerError, err, fmt.Sprintf("decoding header (%v)", tokenParts[0])
+	}
+	var t struct {
+		Typ string
+		Alg string
+	}
+	err = json.Unmarshal(header, &t)
+	if err != nil {
+		return http.StatusInternalServerError, ErrMalformedToken, fmt.Sprintf("unmarshalling header (%s)", header)
+	}
+
+	// Then, verify signature
+	mac := hmac.New(sha256.New, []byte(m.secret))
+	message := []byte(strings.Join([]string{tokenParts[0], tokenParts[1]}, "."))
+	mac.Write(message)
+	expectedMac, err := encode(mac.Sum(nil))
+	if err != nil {
+		return http.StatusInternalServerError, err, ""
+	}
+	if !hmac.Equal([]byte(tokenParts[2]), []byte(expectedMac)) {
+		return http.StatusUnauthorized, ErrInvalidSignature, fmt.Sprintf("checking signature (%v)", tokenParts[2])
+	}
+
+	// Finally, check claims
+	claimSet, err := decode(tokenParts[1])
+	if err != nil {
+		return http.StatusInternalServerError, ErrDecoding, "decoding claims"
+	}
+	err = v(claimSet, r)
+	if err != nil {
+		return http.StatusUnauthorized, err, "handling claims callback"
+	}
+
+	return 200, nil, ""
 }
 
 type jwtError struct {
