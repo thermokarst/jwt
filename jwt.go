@@ -143,15 +143,31 @@ func (m *Middleware) Authenticate() http.Handler {
 				message: "receiving request",
 			}
 		}
-		var b map[string]string
-		err := json.NewDecoder(r.Body).Decode(&b)
-		if err != nil {
-			return &jwtError{
-				status:  http.StatusInternalServerError,
-				err:     ErrParsingCredentials,
-				message: "parsing authorization",
+
+		b := make(map[string]string, 0)
+		contentType := r.Header.Get("content-type")
+		switch contentType {
+		case "application/x-www-form-urlencoded":
+			identity, verify := r.FormValue(m.identityField), r.FormValue(m.verifyField)
+			if identity == "" || verify == "" {
+				return &jwtError{
+					status:  http.StatusInternalServerError,
+					err:     ErrParsingCredentials,
+					message: "parsing authorization",
+				}
+			}
+			b[m.identityField], b[m.verifyField] = identity, verify
+		default:
+			err := json.NewDecoder(r.Body).Decode(&b)
+			if err != nil {
+				return &jwtError{
+					status:  http.StatusInternalServerError,
+					err:     ErrParsingCredentials,
+					message: "parsing authorization",
+				}
 			}
 		}
+
 		// Check if required fields are in the body
 		if _, ok := b[m.identityField]; !ok {
 			return &jwtError{
@@ -167,7 +183,7 @@ func (m *Middleware) Authenticate() http.Handler {
 				message: "parsing credentials, missing verify field",
 			}
 		}
-		err = m.auth(b[m.identityField], b[m.verifyField])
+		err := m.auth(b[m.identityField], b[m.verifyField])
 		if err != nil {
 			return &jwtError{
 				status:  http.StatusInternalServerError,
