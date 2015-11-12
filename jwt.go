@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -103,14 +102,9 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			queryParam := r.FormValue("token")
-			if queryParam == "" {
+			token = r.FormValue("token")
+			if token == "" {
 				return &jwtError{status: http.StatusUnauthorized, err: ErrMissingToken}
-			}
-			var err error
-			token, err = url.QueryUnescape(queryParam)
-			if err != nil {
-				return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
 			}
 		} else {
 			token = strings.Split(authHeader, " ")[1]
