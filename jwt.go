@@ -141,7 +141,7 @@ func (m *Middleware) Authenticate() http.Handler {
 		b := make(map[string]string, 0)
 		contentType := r.Header.Get("content-type")
 		switch contentType {
-		case "application/x-www-form-urlencoded":
+		case "application/x-www-form-urlencoded", "application/x-www-form-urlencoded; charset=UTF-8":
 			identity, verify := r.FormValue(m.identityField), r.FormValue(m.verifyField)
 			if identity == "" || verify == "" {
 				return &jwtError{
