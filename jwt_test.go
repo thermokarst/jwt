@@ -232,3 +232,16 @@ func TestGenerateTokenHandlerNotPOST(t *testing.T) {
 		t.Errorf("wanted %q, got %q", ErrInvalidMethod.Error(), body)
 	}
 }
+
+func TestMalformedAuthorizationHeader(t *testing.T) {
+	_, middleware := newToken(t)
+	token := "hello!"
+	resp := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req.Header.Set("Authorization", token) // No "Bearer " portion of header
+	middleware.Secure(testHandler, verifyClaimsFunc).ServeHTTP(resp, req)
+	body := strings.TrimSpace(resp.Body.String())
+	if body != ErrMalformedToken.Error() {
+		t.Errorf("wanted %q, got %q", ErrMalformedToken.Error(), body)
+	}
+}

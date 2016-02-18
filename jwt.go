@@ -107,7 +107,11 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 				return &jwtError{status: http.StatusUnauthorized, err: ErrMissingToken}
 			}
 		} else {
-			token = strings.Split(authHeader, " ")[1]
+			token_parts := strings.Split(authHeader, " ")
+			if len(token_parts) != 2 {
+				return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
+			}
+			token = token_parts[1]
 		}
 
 		if status, err, message := m.VerifyToken(token, v, r); err != nil {
