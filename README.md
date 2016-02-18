@@ -2,8 +2,8 @@
 
 [![GoDoc](https://godoc.org/github.com/thermokarst/jwt?status.svg)](https://godoc.org/github.com/thermokarst/jwt)
 
-A simple, opinionated Go net/http middleware for integrating JSON Web Tokens into
-your application:
+A simple (bring your own logic), opinionated Go net/http middleware for integrating
+JSON Web Tokens into your application:
 
 ```go
 package main
