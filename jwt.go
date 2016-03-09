@@ -107,18 +107,18 @@ func (m *Middleware) Secure(h http.Handler, v VerifyClaimsFunc) http.Handler {
 				return &jwtError{status: http.StatusUnauthorized, err: ErrMissingToken}
 			}
 		} else {
-			token_parts := strings.Split(authHeader, " ")
-			if len(token_parts) != 2 {
+			tokenParts := strings.Split(authHeader, " ")
+			if len(tokenParts) != 2 {
 				return &jwtError{status: http.StatusUnauthorized, err: ErrMalformedToken}
 			}
-			token = token_parts[1]
+			token = tokenParts[1]
 		}
 
-		if status, err, message := m.VerifyToken(token, v, r); err != nil {
+		if status, message, err := m.VerifyToken(token, v, r); err != nil {
 			return &jwtError{
 				status:  status,
-				err:     err,
 				message: message,
+				err:     err,
 			}
 		}
 
@@ -242,16 +242,16 @@ func (m *Middleware) CreateToken(identity string) (string, error) {
 }
 
 // VerifyToken verifies a token
-func (m *Middleware) VerifyToken(token string, v VerifyClaimsFunc, r *http.Request) (int, error, string) {
+func (m *Middleware) VerifyToken(token string, v VerifyClaimsFunc, r *http.Request) (int, string, error) {
 	tokenParts := strings.Split(token, ".")
 	if len(tokenParts) != 3 {
-		return http.StatusUnauthorized, ErrMalformedToken, ""
+		return http.StatusUnauthorized, "", ErrMalformedToken
 	}
 
 	// First, verify JOSE header
 	header, err := decode(tokenParts[0])
 	if err != nil {
-		return http.StatusInternalServerError, err, fmt.Sprintf("decoding header (%v)", tokenParts[0])
+		return http.StatusInternalServerError, fmt.Sprintf("decoding header (%v)", tokenParts[0]), err
 	}
 	var t struct {
 		Typ string
@@ -259,7 +259,7 @@ func (m *Middleware) VerifyToken(token string, v VerifyClaimsFunc, r *http.Reque
 	}
 	err = json.Unmarshal(header, &t)
 	if err != nil {
-		return http.StatusInternalServerError, ErrMalformedToken, fmt.Sprintf("unmarshalling header (%s)", header)
+		return http.StatusInternalServerError, fmt.Sprintf("unmarshalling header (%s)", header), ErrMalformedToken
 	}
 
 	// Then, verify signature
@@ -268,29 +268,29 @@ func (m *Middleware) VerifyToken(token string, v VerifyClaimsFunc, r *http.Reque
 	mac.Write(message)
 	expectedMac, err := encode(mac.Sum(nil))
 	if err != nil {
-		return http.StatusInternalServerError, err, ""
+		return http.StatusInternalServerError, "", err
 	}
 	if !hmac.Equal([]byte(tokenParts[2]), []byte(expectedMac)) {
-		return http.StatusUnauthorized, ErrInvalidSignature, fmt.Sprintf("checking signature (%v)", tokenParts[2])
+		return http.StatusUnauthorized, fmt.Sprintf("checking signature (%v)", tokenParts[2]), ErrInvalidSignature
 	}
 
 	// Finally, check claims
 	claimSet, err := decode(tokenParts[1])
 	if err != nil {
-		return http.StatusInternalServerError, ErrDecoding, "decoding claims"
+		return http.StatusInternalServerError, "decoding claims", ErrDecoding
 	}
 	err = v(claimSet, r)
 	if err != nil {
-		return http.StatusUnauthorized, err, "handling claims callback"
+		return http.StatusUnauthorized, "handling claims callback", err
 	}
 
-	return 200, nil, ""
+	return 200, "", nil
 }
 
 type jwtError struct {
 	status  int
-	err     error
 	message string
+	err     error
 }
 
 type errorHandler func(http.ResponseWriter, *http.Request) *jwtError
