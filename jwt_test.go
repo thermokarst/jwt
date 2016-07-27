@@ -136,12 +136,12 @@ func TestGenerateTokenHandler(t *testing.T) {
 	token, m := newToken(t)
 	j := strings.Split(token, ".")
 
-	header := base64.StdEncoding.EncodeToString([]byte(`{"typ":"JWT","alg":"HS256"}`))
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"typ":"JWT","alg":"HS256"}`))
 	if j[0] != header {
 		t.Errorf("wanted %v, got %v", header, j[0])
 	}
 
-	claims, err := base64.StdEncoding.DecodeString(j[1])
+	claims, err := base64.RawURLEncoding.DecodeString(j[1])
 	var c struct {
 		Exp int
 		Iat int
@@ -158,7 +158,7 @@ func TestGenerateTokenHandler(t *testing.T) {
 	mac := hmac.New(sha256.New, []byte(m.secret))
 	message := []byte(strings.Join([]string{j[0], j[1]}, "."))
 	mac.Write(message)
-	expectedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	expectedMac := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	if !hmac.Equal([]byte(j[2]), []byte(expectedMac)) {
 		t.Errorf("wanted %v, got %v", expectedMac, j[2])
 	}
