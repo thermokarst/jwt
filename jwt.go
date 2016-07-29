@@ -314,9 +314,9 @@ func encode(s interface{}) (string, error) {
 	default:
 		return "", ErrEncoding
 	}
-	return base64.StdEncoding.EncodeToString(r), nil
+	return base64.RawURLEncoding.EncodeToString(r), nil
 }
 
 func decode(s string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(s)
+	return base64.RawURLEncoding.DecodeString(s)
 }
